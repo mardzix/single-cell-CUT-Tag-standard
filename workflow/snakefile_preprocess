@@ -1,12 +1,13 @@
 rule all_preprocess:
   input:
-    expand(config['out_prefix'] + '/{antibody}/{sample}/bigwig/all_reads.bw', sample=config['sample_name'], antibody=config['antibody']),
-    expand(config['out_prefix'] + '/{antibody}/{sample}/macs/narrow/{sample}_peaks.narrowPeak',sample=config['sample_name'],antibody=config['antibody']),
-    expand(config['out_prefix'] + '/{antibody}/{sample}/macs/broad/{sample}_peaks.broadPeak',sample=config['sample_name'],antibody=config['antibody']),
-    expand(config['out_prefix'] + '/{antibody}/{sample}/barcode_metrics/peaks_barcodes.txt', sample = config['sample_name'],antibody = config['antibody']),
-    expand(config['out_prefix'] + '/{antibody}/{sample}/barcode_metrics/all_barcodes.txt', sample = config['sample_name'],antibody = config['antibody']),
-    expand(config['out_prefix'] + '/{antibody}/{sample}/outs/fragments.tsv.gz', sample= config['sample_name'], antibody = config['antibody']),
-    expand(config['out_prefix'] + "/{antibody}/{sample}/cell_picking/metadata.csv", sample= config['sample_name'], antibody = config['antibody']),
+    expand(config['out_prefix'] + '{antibody}/{sample}/bigwig/all_reads.bw', sample=config['sample_name'], antibody=config['antibody']),
+    expand(config['out_prefix'] + '{antibody}/{sample}/macs/narrow/{sample}_peaks.narrowPeak',sample=config['sample_name'],antibody=config['antibody']),
+    expand(config['out_prefix'] + '{antibody}/{sample}/macs/broad/{sample}_peaks.broadPeak',sample=config['sample_name'],antibody=config['antibody']),
+    expand(config['out_prefix'] + '{antibody}/{sample}/barcode_metrics/peaks_barcodes.txt', sample = config['sample_name'],antibody = config['antibody']),
+    expand(config['out_prefix'] + '{antibody}/{sample}/barcode_metrics/all_barcodes.txt', sample = config['sample_name'],antibody = config['antibody']),
+    expand(config['out_prefix'] + '{antibody}/{sample}/outs/fragments.tsv.gz', sample= config['sample_name'], antibody = config['antibody']),
+    expand(config['out_prefix'] + "{antibody}/{sample}/cell_picking/metadata.csv", sample= config['sample_name'], antibody = config['antibody']),
+    expand(config['out_prefix'] + "{antibody}/{sample}/seurat/bin_{binwidth}/Seurat_object.Rds", sample= config['sample_name'], antibody = config['antibody'],binwidth=[5000,10000,25000,50000,250000]),
 
 
 print(config)
@@ -15,7 +16,7 @@ rule bam_to_bw:
     input:
         cellranger_bam = config['cellranger_path'] + '/outs/possorted_bam.bam'
     output:
-        bigwig         = config['out_prefix'] + '/{antibody}/{sample}/bigwig/all_reads.bw'
+        bigwig         = config['out_prefix'] + '{antibody}/{sample}/bigwig/all_reads.bw'
     threads: 8
     shell:
         'bamCoverage -b {input.cellranger_bam} -o {output.bigwig} -p {threads} --minMappingQuality 5 '
@@ -26,9 +27,9 @@ rule run_macs_narrow:
     input:
         cellranger_bam = config['cellranger_path'] + '/outs/possorted_bam.bam'
     output:
-        narrow_peaks = config['out_prefix'] + '/{antibody}/{sample}/macs/narrow/{sample}_peaks.narrowPeak'
+        narrow_peaks = config['out_prefix'] + '{antibody}/{sample}/macs/narrow/{sample}_peaks.narrowPeak'
     params:
-        macs_outdir  = config['out_prefix'] + '/{antibody}/{sample}/macs/narrow/'
+        macs_outdir  = config['out_prefix'] + '{antibody}/{sample}/macs/narrow/'
     shell:
         'macs2 callpeak -t {input.cellranger_bam} -g mm -f BAMPE -n {wildcards.sample} '
         '--outdir {params.macs_outdir} -q 0.05 -B --SPMR --keep-dup=1 2>&1 '
@@ -37,9 +38,9 @@ rule run_macs:
     input:
         config['cellranger_path'] + '/outs/possorted_bam.bam'
     output:
-        broad_peaks = config['out_prefix'] + '/{antibody}/{sample}/macs/broad/{sample}_peaks.broadPeak'
+        broad_peaks = config['out_prefix'] + '{antibody}/{sample}/macs/broad/{sample}_peaks.broadPeak'
     params:
-        macs_outdir = config['out_prefix'] + '/{antibody}/{sample}/macs/broad/'
+        macs_outdir = config['out_prefix'] + '{antibody}/{sample}/macs/broad/'
     shell:
         'macs2 callpeak -t {input} -g mm -f BAMPE -n {wildcards.sample} '
         '--outdir {params.macs_outdir} -q 0.05 -B --SPMR --keep-dup=1 --broad-cutoff=0.1 --broad 2>&1 '
@@ -48,8 +49,8 @@ rule add_barcode_fragments:
     input:
         fragments = config['cellranger_path'] + '/outs/fragments.tsv.gz'
     output:
-        fragments = config['out_prefix'] + '/{antibody}/{sample}/outs/fragments.tsv.gz',
-        index     = config['out_prefix'] + '/{antibody}/{sample}/outs/fragments.tsv.gz.tbi',
+        fragments = config['out_prefix'] + '{antibody}/{sample}/outs/fragments.tsv.gz',
+        index     = config['out_prefix'] + '{antibody}/{sample}/outs/fragments.tsv.gz.tbi',
     params:
         script    = os.path.dirname(workflow.basedir) + '/scripts/add_sample_to_fragments.py',
     shell:
@@ -59,9 +60,9 @@ rule add_barcode_fragments:
 rule barcode_overlap_peaks:
     input:
         bam    = config['cellranger_path'] + '/outs/possorted_bam.bam',
-        peaks  = config['out_prefix']      + '/{antibody}/{sample}/macs/broad/{sample}_peaks.broadPeak',
+        peaks  = config['out_prefix']      + '{antibody}/{sample}/macs/broad/{sample}_peaks.broadPeak',
     output:
-        broad  = config['out_prefix'] + '/{antibody}/{sample}/barcode_metrics/peaks_barcodes.txt'
+        broad  = config['out_prefix'] + '{antibody}/{sample}/barcode_metrics/peaks_barcodes.txt'
     params:
         get_cell_barcode     = os.path.dirname(workflow.basedir) + '/scripts/get_cell_barcode.awk',
         add_sample_to_list   = os.path.dirname(workflow.basedir) + '/scripts/add_sample_to_list.py',
@@ -76,7 +77,7 @@ rule barcode_metrics_all:
   input:
      bam       = config['cellranger_path'] + '/outs/possorted_bam.bam',
   output:
-    all_bcd    = config['out_prefix'] + '/{antibody}/{sample}/barcode_metrics/all_barcodes.txt'
+    all_bcd    = config['out_prefix'] + '{antibody}/{sample}/barcode_metrics/all_barcodes.txt'
   params:
       get_cell_barcode=os.path.dirname(workflow.basedir) + '/scripts/get_cell_barcode.awk',
       add_sample_to_list=os.path.dirname(workflow.basedir) + '/scripts/add_sample_to_list.py',
@@ -91,33 +92,34 @@ rule barcode_metrics_all:
 ####### CELLS SELECTION
 rule cell_selection:
     input:
-        bcd_all   = config['out_prefix'] + '/{antibody}/{sample}/barcode_metrics/all_barcodes.txt',
-        bcd_peak  = config['out_prefix'] + '/{antibody}/{sample}/barcode_metrics/peaks_barcodes.txt',
-        peaks     = config['out_prefix'] + '/{antibody}/{sample}/macs/broad/{sample}_peaks.broadPeak',
+        bcd_all   = config['out_prefix'] + '{antibody}/{sample}/barcode_metrics/all_barcodes.txt',
+        bcd_peak  = config['out_prefix'] + '{antibody}/{sample}/barcode_metrics/peaks_barcodes.txt',
+        peaks     = config['out_prefix'] + '{antibody}/{sample}/macs/broad/{sample}_peaks.broadPeak',
         metadata  = config['cellranger_path'] + '/outs/singlecell.csv',
-        fragments = config['out_prefix'] + '/{antibody}/{sample}/outs/fragments.tsv.gz',
+        fragments = config['out_prefix'] + '{antibody}/{sample}/outs/fragments.tsv.gz',
     output:
-        config['out_prefix'] + "/{antibody}/{sample}/cell_picking/cells_10x.png",
-        config['out_prefix'] + "/{antibody}/{sample}/cell_picking/cells_picked.png",
-        config['out_prefix'] + "/{antibody}/{sample}/cell_picking/cells_picked.bw",
-        config['out_prefix'] + "/{antibody}/{sample}/cell_picking/cells_not_picked.bw",
-        config['out_prefix'] + "/{antibody}/{sample}/cell_picking/metadata.csv",
+        config['out_prefix'] + "{antibody}/{sample}/cell_picking/cells_10x.png",
+        config['out_prefix'] + "{antibody}/{sample}/cell_picking/cells_picked.png",
+        config['out_prefix'] + "{antibody}/{sample}/cell_picking/cells_picked.bw",
+        config['out_prefix'] + "{antibody}/{sample}/cell_picking/cells_not_picked.bw",
+        config['out_prefix'] + "{antibody}/{sample}/cell_picking/metadata.csv",
     params:
         script      = os.path.dirname(workflow.basedir) + '/scripts/pick_cells.R',
-        out_prefix  = config['out_prefix'] + "/{antibody}/{sample}/cell_picking/",
+        out_prefix  = config['out_prefix'] + "{antibody}/{sample}/cell_picking/",
     shell:
         "Rscript {params.script} --metadata {input.metadata} --fragments {input.fragments} --bcd_all {input.bcd_all} --bcd_peak {input.bcd_peak} --antibody {wildcards.antibody} --sample {wildcards.sample} --out_prefix {params.out_prefix}"
 
 
-# rule create_seurat_object:
-#     input:
-#         metadata="results/{sample}/cell_picking/metadata.csv",
-#         fragments=lambda wildcards: config['samples'][wildcards.sample]['cellranger_out'] + '/outs/fragments.tsv.gz',
-#     output:
-#         "results/{sample}/seurat/bin_{binwidth}/Seurat_object.Rds",
-#     params:
-#         script=os.path.dirname(workflow.basedir) + '/scripts/R/create_seurat_object.R',
-#         out_prefix="results/{sample}/seurat/bin_{binwidth}/",
-#         config_file=config_file,
-#     shell:
-#         "Rscript {params.script} --sample {wildcards.sample} --metadata {input.metadata} --config {params.config_file} --out_prefix {params.out_prefix} --window {wildcards.binwidth}"
+rule create_seurat_object:
+    input:
+        metadata  = config['out_prefix'] + "{antibody}/{sample}/cell_picking/metadata.csv",
+        fragments = config['out_prefix'] + '{antibody}/{sample}/outs/fragments.tsv.gz',
+        peaks     = config['out_prefix'] + '{antibody}/{sample}/macs/broad/{sample}_peaks.broadPeak',
+    output:
+        config['out_prefix'] + "{antibody}/{sample}/seurat/bin_{binwidth}/Seurat_object.Rds",
+    params:
+        script      = os.path.dirname(workflow.basedir) + '/scripts/create_seurat_object.R',
+        out_prefix  = config['out_prefix'] + "{antibody}/{sample}/seurat/bin_{binwidth}/",
+        genome      = config['genome']
+    shell:
+        "Rscript {params.script} --sample {wildcards.sample}   --antibody {wildcards.antibody} --metadata {input.metadata}   --fragments {input.fragments} --peaks {input.peaks} --out_prefix {params.out_prefix} --window {wildcards.binwidth} --genome_version {params.genome}"

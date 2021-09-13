@@ -2,15 +2,13 @@ cat("*** Loading libraries*** \n")
 library(argparse)
 library(yaml)
 library(ggplot2)
+library(funr)
 # library(rtracklayer)
 # library(GenomicRanges)
 
 
 # Source aux functions
-args <- commandArgs(trailingOnly=FALSE)
-path <- gsub("--file=","",args[grep(pattern="--file=",x=args)])
-source(paste0(dirname(path),"/func.R"))
-
+source(paste0(dirname(funr::sys.script()),"/func.R"))
 set.seed(1234)
 
 ########### Arguments parser
