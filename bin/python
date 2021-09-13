@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+source /data/proj/GCB_MB/miniconda3/etc/profile.d/conda.sh
+conda activate CT_snakemake
+python "$@"

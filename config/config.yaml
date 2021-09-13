@@ -1,0 +1,4 @@
+sample_name: CT_SE21_01
+antibody: G4_cell_lines
+cellranger_path: /data/proj/GCB_MB/single-cell-CUT-Tag/jing_colab/cellranger/scCT_SE21_01
+out_prefix: /data/proj/GCB_MB/single-cell-CUT-Tag/jing_colab/out_test/
