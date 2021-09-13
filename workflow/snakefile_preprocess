@@ -3,11 +3,13 @@ rule all_preprocess:
     expand(config['out_prefix'] + '/{antibody}/{sample}/bigwig/all_reads.bw', sample=config['sample_name'], antibody=config['antibody']),
     expand(config['out_prefix'] + '/{antibody}/{sample}/macs/narrow/{sample}_peaks.narrowPeak',sample=config['sample_name'],antibody=config['antibody']),
     expand(config['out_prefix'] + '/{antibody}/{sample}/macs/broad/{sample}_peaks.broadPeak',sample=config['sample_name'],antibody=config['antibody']),
-    expand(config['out_prefix'] + '/{antibody}/{sample}/barcode_metrics/peaks_barcodes_broad.txt', sample = config['sample_name'],antibody = config['antibody']),
-    #expand(config['out_prefix'] + '/{antibody}/{sample}/barcode_metrics/peaks_barcodes_narrow.txt', sample = config['sample_name'],antibody = config['antibody']),
-    #expand(config['out_prefix'] + '/{antibody}/{sample}/barcode_metrics/all_barcodes.txt', sample = config['sample_name'],antibody = config['antibody']),
+    expand(config['out_prefix'] + '/{antibody}/{sample}/barcode_metrics/peaks_barcodes.txt', sample = config['sample_name'],antibody = config['antibody']),
+    expand(config['out_prefix'] + '/{antibody}/{sample}/barcode_metrics/all_barcodes.txt', sample = config['sample_name'],antibody = config['antibody']),
     expand(config['out_prefix'] + '/{antibody}/{sample}/outs/fragments.tsv.gz', sample= config['sample_name'], antibody = config['antibody']),
+    expand(config['out_prefix'] + "/{antibody}/{sample}/cell_picking/metadata.csv", sample= config['sample_name'], antibody = config['antibody']),
 
+
+print(config)
 
 rule bam_to_bw:
     input:
@@ -31,7 +33,7 @@ rule run_macs_narrow:
         'macs2 callpeak -t {input.cellranger_bam} -g mm -f BAMPE -n {wildcards.sample} '
         '--outdir {params.macs_outdir} -q 0.05 -B --SPMR --keep-dup=1 2>&1 '
 
-rule run_macs_broad:
+rule run_macs:
     input:
         config['cellranger_path'] + '/outs/possorted_bam.bam'
     output:
@@ -54,56 +56,68 @@ rule add_barcode_fragments:
         'python3 {params.script} {input.fragments} {wildcards.sample} | bgzip > {output.fragments}; '
         'tabix -p bed {output.fragments}'
 
-rule barcode_overlap_broad:
+rule barcode_overlap_peaks:
     input:
-        bam          = config['cellranger_path'] + '/outs/possorted_bam.bam',
-        peaks_broad  = config['out_prefix']      + '/{antibody}/{sample}/macs/broad/{sample}_peaks.broadPeak',
+        bam    = config['cellranger_path'] + '/outs/possorted_bam.bam',
+        peaks  = config['out_prefix']      + '/{antibody}/{sample}/macs/broad/{sample}_peaks.broadPeak',
     output:
-        broad        = config['out_prefix'] + '/{antibody}/{sample}/barcode_metrics/peaks_barcodes_broad.txt'
+        broad  = config['out_prefix'] + '/{antibody}/{sample}/barcode_metrics/peaks_barcodes.txt'
     params:
         get_cell_barcode     = os.path.dirname(workflow.basedir) + '/scripts/get_cell_barcode.awk',
         add_sample_to_list   = os.path.dirname(workflow.basedir) + '/scripts/add_sample_to_list.py',
         tmpdir               = config['tempdir']
     shell:
       #  'set +o pipefail; '
-        'bedtools intersect -abam {input.bam} -b {input.peaks_broad} -u | samtools view -f2 | '
-        'awk -f {params.get_cell_barcode} | sed "s/CB:Z://g" | python3 {params.add_sample_to_list}'
+        'bedtools intersect -abam {input.bam} -b {input.peaks} -u | samtools view -f2 | '
+        'awk -f {params.get_cell_barcode} | sed "s/CB:Z://g" | python3 {params.add_sample_to_list} {wildcards.sample} | '
         'sort -T {params.tmpdir} | uniq -c > {output.broad} && [[ -s {output.broad} ]] ; '
 
-# rule barcode_overlap_narrow:
+rule barcode_metrics_all:
+  input:
+     bam       = config['cellranger_path'] + '/outs/possorted_bam.bam',
+  output:
+    all_bcd    = config['out_prefix'] + '/{antibody}/{sample}/barcode_metrics/all_barcodes.txt'
+  params:
+      get_cell_barcode=os.path.dirname(workflow.basedir) + '/scripts/get_cell_barcode.awk',
+      add_sample_to_list=os.path.dirname(workflow.basedir) + '/scripts/add_sample_to_list.py',
+      tmpdir=config['tempdir']
+  shell:
+    #' set +o pipefail; '
+    ' samtools view -f2 {input.bam}| '
+    'awk -f {params.get_cell_barcode} | sed "s/CB:Z://g" | python3 {params.add_sample_to_list} {wildcards.sample} | '
+    'sort -T {params.tmpdir} | uniq -c > {output.all_bcd} && [[ -s {output.all_bcd} ]] ; '
+
+
+####### CELLS SELECTION
+rule cell_selection:
+    input:
+        bcd_all   = config['out_prefix'] + '/{antibody}/{sample}/barcode_metrics/all_barcodes.txt',
+        bcd_peak  = config['out_prefix'] + '/{antibody}/{sample}/barcode_metrics/peaks_barcodes.txt',
+        peaks     = config['out_prefix'] + '/{antibody}/{sample}/macs/broad/{sample}_peaks.broadPeak',
+        metadata  = config['cellranger_path'] + '/outs/singlecell.csv',
+        fragments = config['out_prefix'] + '/{antibody}/{sample}/outs/fragments.tsv.gz',
+    output:
+        config['out_prefix'] + "/{antibody}/{sample}/cell_picking/cells_10x.png",
+        config['out_prefix'] + "/{antibody}/{sample}/cell_picking/cells_picked.png",
+        config['out_prefix'] + "/{antibody}/{sample}/cell_picking/cells_picked.bw",
+        config['out_prefix'] + "/{antibody}/{sample}/cell_picking/cells_not_picked.bw",
+        config['out_prefix'] + "/{antibody}/{sample}/cell_picking/metadata.csv",
+    params:
+        script      = os.path.dirname(workflow.basedir) + '/scripts/pick_cells.R',
+        out_prefix  = config['out_prefix'] + "/{antibody}/{sample}/cell_picking/",
+    shell:
+        "Rscript {params.script} --metadata {input.metadata} --fragments {input.fragments} --bcd_all {input.bcd_all} --bcd_peak {input.bcd_peak} --antibody {wildcards.antibody} --sample {wildcards.sample} --out_prefix {params.out_prefix}"
+
+
+# rule create_seurat_object:
 #     input:
-#         bam          = lambda wildcards: config['samples'][wildcards.sample]['cellranger_out'] + '/outs/possorted_bam.bam',
-#         peaks_narrow = 'results/{sample}/macs/narrow/{sample}_peaks.narrowPeak'
+#         metadata="results/{sample}/cell_picking/metadata.csv",
+#         fragments=lambda wildcards: config['samples'][wildcards.sample]['cellranger_out'] + '/outs/fragments.tsv.gz',
 #     output:
-#         narrow = 'results/{sample}/barcode_metrics/peaks_barcodes_narrow.txt',
+#         "results/{sample}/seurat/bin_{binwidth}/Seurat_object.Rds",
 #     params:
-#         scripts    = os.path.dirname(workflow.basedir) + '/scripts',
-#         tmpdir     = config['general']['tmpdir'],
+#         script=os.path.dirname(workflow.basedir) + '/scripts/R/create_seurat_object.R',
+#         out_prefix="results/{sample}/seurat/bin_{binwidth}/",
+#         config_file=config_file,
 #     shell:
-#         ' bedtools intersect -abam {input.bam} -b {input.peaks_narrow} -u | samtools view -f2 | '
-#         ' awk -f {params.scripts}/get_cell_barcode.awk | sed 's/CB:Z://g' | sort -T {params.tmpdir} | uniq -c > {output.narrow} && [[ -s {output.narrow} ]] ;'
-
-# rule barcode_metrics_all:
-#   input:
-#      bam       = lambda wildcards: config['samples'][wildcards.sample]['cellranger_out'] + '/outs/possorted_bam.bam',
-#   output:
-#     all_bcd    = 'results/{sample}/barcode_metrics/all_barcodes.txt'
-#   params:
-#     scripts    = os.path.dirname(workflow.basedir) + '/scripts',
-#     tmpdir     = config['general']['tmpdir']
-#   shell:
-#     #' set +o pipefail; '
-#     ' samtools view -f2 {input.bam}| '
-#     ' awk -f {params.scripts}/get_cell_barcode.awk | sed 's/CB:Z://g' | sort -T {params.tmpdir} | uniq -c > {output.all_bcd} && [[ -s {output.all_bcd} ]] '
-#
-#
-#
-
-
-# ####### CELLS SELECTION
-# rule cell_selection:
-#   input:
-#       all_bcd    = 'results/{sample}/barcode_metrics/all_barcodes.txt',
-#       bcd_narrow = 'results/{sample}/barcode_metrics/peaks_barcodes_narrow.txt',
-#       bcd_broad  = 'results/{sample}/barcode_metrics/peaks_barcodes_broad.txt',
-#       peaks      = 'results/{sample}/macs/broad/{sample}_peaks.broadPeak',
+#         "Rscript {params.script} --sample {wildcards.sample} --metadata {input.metadata} --config {params.config_file} --out_prefix {params.out_prefix} --window {wildcards.binwidth}"
