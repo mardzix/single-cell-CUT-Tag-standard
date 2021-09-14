@@ -9,9 +9,6 @@ rule all_preprocess:
     expand(config['out_prefix'] + "{antibody}/{sample}/cell_picking/metadata.csv", sample= config['sample_name'], antibody = config['antibody']),
     expand(config['out_prefix'] + "{antibody}/{sample}/seurat/bin_{binwidth}/Seurat_object.Rds", sample= config['sample_name'], antibody = config['antibody'],binwidth=[5000,10000,25000,50000,250000]),
 
-
-print(config)
-
 rule bam_to_bw:
     input:
         cellranger_bam = config['cellranger_path'] + '/outs/possorted_bam.bam'

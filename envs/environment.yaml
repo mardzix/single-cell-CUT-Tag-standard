@@ -1,0 +1,13 @@
+name: single-cell-cut-tag
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+  - r
+dependencies:
+  - python=3.6.10
+  - macs2=2.2.7.1
+  - samtools=1.9
+  - deeptools=3.4.3
+  - htslib=1.9
+  - bedtools=2.29.2
