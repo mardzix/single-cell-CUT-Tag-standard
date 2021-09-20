@@ -1,4 +1,16 @@
+# Default ignored files
+/shelf/
+/workspace.xml
+# Datasource local storage ignored files
+/dataSources/
+/dataSources.local.xml
+# Editor-based HTTP Client requests
+/httpRequests/
+/deployment.xml
+/misc.xml
+
 /.idea/vcs.xml
 /.idea/inspectionProfiles/profiles_settings.xml
 /.idea/modules.xml
 /.idea/standard_scCT_preprocess.iml
+

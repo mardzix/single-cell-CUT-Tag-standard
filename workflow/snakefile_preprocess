@@ -3,14 +3,11 @@ rule all_preprocess:
     expand(config['out_prefix'] + '{antibody}/{sample}/bigwig/all_reads.bw', sample=config['sample_name'], antibody=config['antibody']),
     expand(config['out_prefix'] + '{antibody}/{sample}/macs/narrow/{sample}_peaks.narrowPeak',sample=config['sample_name'],antibody=config['antibody']),
     expand(config['out_prefix'] + '{antibody}/{sample}/macs/broad/{sample}_peaks.broadPeak',sample=config['sample_name'],antibody=config['antibody']),
-    expand(config['out_prefix'] + '{antibody}/{sample}/SEACR/fragments.bg',sample=config['sample_name'],antibody=config['antibody']),
-    expand(config['out_prefix'] + '{antibody}/{sample}/SEACR/peaks.relaxed.bed',sample=config['sample_name'],antibody=config['antibody']),
     expand(config['out_prefix'] + '{antibody}/{sample}/barcode_metrics/peaks_barcodes.txt', sample = config['sample_name'],antibody = config['antibody']),
     expand(config['out_prefix'] + '{antibody}/{sample}/barcode_metrics/all_barcodes.txt', sample = config['sample_name'],antibody = config['antibody']),
     expand(config['out_prefix'] + '{antibody}/{sample}/outs/fragments.tsv.gz', sample= config['sample_name'], antibody = config['antibody']),
     expand(config['out_prefix'] + "{antibody}/{sample}/cell_picking/metadata.csv", sample= config['sample_name'], antibody = config['antibody']),
     expand(config['out_prefix'] + "{antibody}/{sample}/seurat/bin_{binwidth}/Seurat_object.Rds", sample= config['sample_name'], antibody = config['antibody'],binwidth=[5000,10000,25000,50000,250000]),
-
 
 
 rule bam_to_bw:
