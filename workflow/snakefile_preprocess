@@ -3,6 +3,8 @@ rule all_preprocess:
     expand(config['out_prefix'] + '{antibody}/{sample}/bigwig/all_reads.bw', sample=config['sample_name'], antibody=config['antibody']),
     expand(config['out_prefix'] + '{antibody}/{sample}/macs/narrow/{sample}_peaks.narrowPeak',sample=config['sample_name'],antibody=config['antibody']),
     expand(config['out_prefix'] + '{antibody}/{sample}/macs/broad/{sample}_peaks.broadPeak',sample=config['sample_name'],antibody=config['antibody']),
+    expand(config['out_prefix'] + '{antibody}/{sample}/SEACR/fragments.bg',sample=config['sample_name'],antibody=config['antibody']),
+    expand(config['out_prefix'] + '{antibody}/{sample}/SEACR/peaks.relaxed.bed',sample=config['sample_name'],antibody=config['antibody']),
     expand(config['out_prefix'] + '{antibody}/{sample}/barcode_metrics/peaks_barcodes.txt', sample = config['sample_name'],antibody = config['antibody']),
     expand(config['out_prefix'] + '{antibody}/{sample}/barcode_metrics/all_barcodes.txt', sample = config['sample_name'],antibody = config['antibody']),
     expand(config['out_prefix'] + '{antibody}/{sample}/outs/fragments.tsv.gz', sample= config['sample_name'], antibody = config['antibody']),
@@ -10,7 +12,6 @@ rule all_preprocess:
     expand(config['out_prefix'] + "{antibody}/{sample}/seurat/bin_{binwidth}/Seurat_object.Rds", sample= config['sample_name'], antibody = config['antibody'],binwidth=[5000,10000,25000,50000,250000]),
 
 
-print(config)
 
 rule bam_to_bw:
     input:
@@ -45,6 +46,34 @@ rule run_macs:
         'macs2 callpeak -t {input} -g mm -f BAMPE -n {wildcards.sample} '
         '--outdir {params.macs_outdir} -q 0.05 -B --SPMR --keep-dup=1 --broad-cutoff=0.1 --broad 2>&1 '
 
+rule download_chromsizes:
+    output:
+        config['out_prefix'] + 'mm10.chrom.sizes'
+    params:
+        url="http://hgdownload.cse.ucsc.edu/goldenpath/mm10/bigZips/mm10.chrom.sizes"
+    shell:
+        "wget -O {output} {params.url}"
+
+rule prep_SEACR_files:
+    input:
+        fragments=config['out_prefix'] + '{antibody}/{sample}/outs/fragments.tsv.gz',
+        genome=config['out_prefix'] + 'mm10.chrom.sizes'
+    output:
+        config['out_prefix'] + '{antibody}/{sample}/SEACR/fragments.bg',
+    shell:
+        "bedtools genomecov -bg -g {input.genome} -i {input.fragments} > {output}"
+
+rule run_SEACR:
+    input:
+        config['out_prefix'] + '{antibody}/{sample}/SEACR/fragments.bg',
+    output:
+        config['out_prefix'] + '{antibody}/{sample}/SEACR/peaks.relaxed.bed',
+    params:
+        out_prefix = config['out_prefix'] + '{antibody}/{sample}/SEACR/peaks',
+    shell:
+        "~/bin/SEACR/SEACR_1.3.sh {input} 0.01 norm relaxed {params.out_prefix}"
+
+
 rule add_barcode_fragments:
     input:
         fragments = config['cellranger_path'] + '/outs/fragments.tsv.gz'
@@ -60,7 +89,7 @@ rule add_barcode_fragments:
 rule barcode_overlap_peaks:
     input:
         bam    = config['cellranger_path'] + '/outs/possorted_bam.bam',
-        peaks  = config['out_prefix']      + '{antibody}/{sample}/macs/broad/{sample}_peaks.broadPeak',
+        peaks  = config['out_prefix'] + '{antibody}/{sample}/SEACR/peaks.relaxed.bed',
     output:
         broad  = config['out_prefix'] + '{antibody}/{sample}/barcode_metrics/peaks_barcodes.txt'
     params:

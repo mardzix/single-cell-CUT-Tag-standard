@@ -45,7 +45,7 @@ parser$add_argument("--max_reads", type="double", default='5.5',
 parser$add_argument("--peak_fraction_min", type="double", default='0.2',
                     help="Minimum fraction of reads within peak")
 
-parser$add_argument("--peak_fraction_max", type="double", default='0.9',
+parser$add_argument("--peak_fraction_max", type="double", default='1',
                     help="Minimum fraction of reads within peak")
 
 
